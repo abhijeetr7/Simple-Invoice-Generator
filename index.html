@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Invoice Generator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- html2pdf.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+        }
+        /* Custom styles for print, hiding buttons */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: #fff; /* White background for print */
+            }
+            .invoice-container {
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
+            }
+        }
+        /* Style for editable fields on hover/focus */
+        [contenteditable="true"]:focus {
+            outline: 2px solid #3b82f6; /* Blue outline on focus */
+            border-radius: 4px;
+        }
+        /* Hide the default file input */
+        #logoUpload {
+            display: none;
+        }
+    </style>
+</head>
+<body class="p-4">
+
+    <div class="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-8 my-8 invoice-container">
+        <!-- Company Info Section -->
+        <div class="flex flex-col md:flex-row justify-between items-start mb-8 pb-4 border-b border-gray-200">
+            <div class="mb-6 md:mb-0">
+                <label for="logoUpload" class="cursor-pointer">
+                    <img id="companyLogo" src="https://placehold.co/150x80/e0e0e0/555555?text=Your+Logo" alt="Company Logo" class="h-20 w-auto rounded-lg shadow-sm object-contain border border-gray-200 p-1">
+                    <input type="file" id="logoUpload" accept="image/*" class="hidden">
+                </label>
+                <h1 contenteditable="true" class="text-3xl font-bold text-gray-800 mt-4 rounded-md px-1 py-0.5">Your Company Name</h1>
+                <p contenteditable="true" class="text-gray-600 mt-1 rounded-md px-1 py-0.5">Your Company Address, City, ZIP</p>
+                <p contenteditable="true" class="text-gray-600 rounded-md px-1 py-0.5">Phone: (123) 456-7890</p>
+                <p contenteditable="true" class="text-gray-600 rounded-md px-1 py-0.5">Email: info@yourcompany.com</p>
+            </div>
+            <div class="text-right">
+                <h2 class="text-4xl font-extrabold text-blue-600 mb-4">INVOICE</h2>
+                <div class="flex items-center justify-end mb-2">
+                    <span class="text-gray-700 font-semibold mr-2">Invoice #</span>
+                    <input type="text" id="invoiceNumber" value="INV-2025-001" class="w-40 p-2 border border-gray-300 rounded-md text-right font-medium text-gray-800 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="flex items-center justify-end mb-2">
+                    <span class="text-gray-700 font-semibold mr-2">Invoice Date:</span>
+                    <input type="date" id="invoiceDate" class="w-40 p-2 border border-gray-300 rounded-md text-right text-gray-800 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div class="flex items-center justify-end">
+                    <span class="text-gray-700 font-semibold mr-2">Due Date:</span>
+                    <input type="date" id="dueDate" class="w-40 p-2 border border-gray-300 rounded-md text-right text-gray-800 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Client Info Section -->
+        <div class="mb-8 pb-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-700 mb-3">Bill To:</h3>
+            <p contenteditable="true" class="text-gray-800 font-medium rounded-md px-1 py-0.5">Client Name</p>
+            <p contenteditable="true" class="text-gray-600 rounded-md px-1 py-0.5">Client Address, City, ZIP</p>
+            <p contenteditable="true" class="text-gray-600 rounded-md px-1 py-0.5">Client Email: client@example.com</p>
+        </div>
+
+        <!-- Items Table Section -->
+        <div class="mb-8">
+            <table class="w-full table-auto border-collapse">
+                <thead>
+                    <tr class="bg-gray-100 text-gray-700 uppercase text-sm leading-normal">
+                        <th class="py-3 px-6 text-left rounded-tl-lg">Description</th>
+                        <th class="py-3 px-6 text-center">Qty</th>
+                        <th class="py-3 px-6 text-right">Rate</th>
+                        <th class="py-3 px-6 text-right rounded-tr-lg">Amount</th>
+                        <th class="py-3 px-6 text-center no-print"></th> <!-- For delete button -->
+                    </tr>
+                </thead>
+                <tbody id="invoiceItems" class="text-gray-700 text-sm font-light">
+                    <!-- Invoice items will be added here by JavaScript -->
+                </tbody>
+            </table>
+            <button id="addItemBtn" class="no-print mt-6 px-6 py-2 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition duration-200 ease-in-out">
+                + Add Item
+            </button>
+        </div>
+
+        <!-- Totals Section -->
+        <div class="flex justify-end mb-8">
+            <div class="w-full md:w-1/2 lg:w-1/3">
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-700 font-semibold">Subtotal:</span>
+                    <span id="subtotal" class="text-gray-800 font-medium">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-700 font-semibold">Tax (<input type="number" id="taxRate" value="0" min="0" max="100" class="w-16 text-right border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 inline-block p-1">%)</span>
+                    <span id="taxAmount" class="text-gray-800 font-medium">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-gray-200">
+                    <span class="text-gray-700 font-semibold">Discount (<input type="number" id="discountRate" value="0" min="0" max="100" class="w-16 text-right border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 inline-block p-1">%)</span>
+                    <span id="discountAmount" class="text-gray-800 font-medium">$0.00</span>
+                </div>
+                <div class="flex justify-between items-center py-4 mt-4 bg-blue-50 text-blue-700 rounded-lg px-4">
+                    <span class="text-xl font-bold">Total:</span>
+                    <span id="grandTotal" class="text-xl font-bold">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="no-print flex justify-center space-x-4 mt-8">
+            <button id="downloadPdfBtn" class="px-8 py-3 bg-green-500 text-white font-bold rounded-lg shadow-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transition duration-200 ease-in-out">
+                Download PDF
+            </button>
+            <button id="printInvoiceBtn" class="px-8 py-3 bg-purple-500 text-white font-bold rounded-lg shadow-lg hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-75 transition duration-200 ease-in-out">
+                Print Invoice
+            </button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get DOM elements
+            const invoiceItemsTable = document.getElementById('invoiceItems');
+            const addItemBtn = document.getElementById('addItemBtn');
+            const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+            const printInvoiceBtn = document.getElementById('printInvoiceBtn');
+            const subtotalSpan = document.getElementById('subtotal');
+            const taxRateInput = document.getElementById('taxRate');
+            const taxAmountSpan = document.getElementById('taxAmount');
+            const discountRateInput = document.getElementById('discountRate');
+            const discountAmountSpan = document.getElementById('discountAmount');
+            const grandTotalSpan = document.getElementById('grandTotal');
+            const companyLogo = document.getElementById('companyLogo');
+            const logoUpload = document.getElementById('logoUpload');
+            const invoiceDateInput = document.getElementById('invoiceDate');
+            const dueDateInput = document.getElementById('dueDate');
+
+            // Set current date for invoice date
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+            const dd = String(today.getDate()).padStart(2, '0');
+            invoiceDateInput.value = `${yyyy}-${mm}-${dd}`;
+
+            // Set due date to 7 days from now
+            const sevenDaysLater = new Date(today);
+            sevenDaysLater.setDate(today.getDate() + 7);
+            const dueYyyy = sevenDaysLater.getFullYear();
+            const dueMm = String(sevenDaysLater.getMonth() + 1).padStart(2, '0');
+            const dueDd = String(sevenDaysLater.getDate()).padStart(2, '0');
+            dueDateInput.value = `${dueYyyy}-${dueMm}-${dueDd}`;
+
+            /**
+             * Adds a new item row to the invoice table.
+             */
+            const addItem = () => {
+                const row = invoiceItemsTable.insertRow();
+                row.classList.add('border-b', 'border-gray-200', 'hover:bg-gray-50');
+
+                // Description Cell
+                const descCell = row.insertCell();
+                descCell.classList.add('py-3', 'px-6', 'text-left');
+                const descInput = document.createElement('input');
+                descInput.type = 'text';
+                descInput.placeholder = 'Item Description';
+                descInput.classList.add('w-full', 'p-2', 'border', 'border-gray-200', 'rounded-md', 'focus:ring-blue-500', 'focus:border-blue-500');
+                descCell.appendChild(descInput);
+
+                // Quantity Cell
+                const qtyCell = row.insertCell();
+                qtyCell.classList.add('py-3', 'px-6', 'text-center');
+                const qtyInput = document.createElement('input');
+                qtyInput.type = 'number';
+                qtyInput.value = '1';
+                qtyInput.min = '0';
+                qtyInput.classList.add('w-20', 'p-2', 'border', 'border-gray-200', 'rounded-md', 'text-center', 'focus:ring-blue-500', 'focus:border-blue-500');
+                qtyCell.appendChild(qtyInput);
+
+                // Rate Cell
+                const rateCell = row.insertCell();
+                rateCell.classList.add('py-3', 'px-6', 'text-right');
+                const rateInput = document.createElement('input');
+                rateInput.type = 'number';
+                rateInput.value = '0.00';
+                rateInput.min = '0';
+                rateInput.step = '0.01';
+                rateInput.classList.add('w-28', 'p-2', 'border', 'border-gray-200', 'rounded-md', 'text-right', 'focus:ring-blue-500', 'focus:border-blue-500');
+                rateCell.appendChild(rateInput);
+
+                // Amount Cell (Read-only)
+                const amountCell = row.insertCell();
+                amountCell.classList.add('py-3', 'px-6', 'text-right');
+                const amountSpan = document.createElement('span');
+                amountSpan.classList.add('font-medium', 'text-gray-800');
+                amountSpan.textContent = '$0.00';
+                amountCell.appendChild(amountSpan);
+
+                // Delete Button Cell
+                const deleteCell = row.insertCell();
+                deleteCell.classList.add('py-3', 'px-6', 'text-center', 'no-print');
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = '✕'; // Times symbol for close/delete
+                deleteButton.classList.add('text-red-500', 'hover:text-red-700', 'font-bold', 'text-lg', 'focus:outline-none');
+                deleteButton.addEventListener('click', () => {
+                    row.remove(); // Remove the row
+                    updateTotals(); // Recalculate totals
+                });
+                deleteCell.appendChild(deleteButton);
+
+                // Event listeners for quantity and rate inputs to update amount and totals
+                const updateRowAmount = () => {
+                    const qty = parseFloat(qtyInput.value) || 0;
+                    const rate = parseFloat(rateInput.value) || 0;
+                    const amount = qty * rate;
+                    amountSpan.textContent = `$${amount.toFixed(2)}`;
+                    updateTotals(); // Recalculate all totals
+                };
+
+                qtyInput.addEventListener('input', updateRowAmount);
+                rateInput.addEventListener('input', updateRowAmount);
+
+                updateRowAmount(); // Calculate initial amount for the new row
+            };
+
+            /**
+             * Updates the subtotal, tax amount, discount amount, and grand total.
+             */
+            const updateTotals = () => {
+                let subtotal = 0;
+                // Iterate over each row in the table body
+                invoiceItemsTable.querySelectorAll('tr').forEach(row => {
+                    // Get the amount from the 4th cell (index 3)
+                    const amountSpan = row.cells[3].querySelector('span');
+                    if (amountSpan) {
+                        subtotal += parseFloat(amountSpan.textContent.replace('$', '')) || 0;
+                    }
+                });
+
+                const taxRate = parseFloat(taxRateInput.value) || 0;
+                const discountRate = parseFloat(discountRateInput.value) || 0;
+
+                const taxAmount = subtotal * (taxRate / 100);
+                const discountAmount = subtotal * (discountRate / 100);
+                const grandTotal = subtotal + taxAmount - discountAmount;
+
+                subtotalSpan.textContent = `$${subtotal.toFixed(2)}`;
+                taxAmountSpan.textContent = `$${taxAmount.toFixed(2)}`;
+                discountAmountSpan.textContent = `$${discountAmount.toFixed(2)}`;
+                grandTotalSpan.textContent = `$${grandTotal.toFixed(2)}`;
+            };
+
+            /**
+             * Handles the logo file upload.
+             * @param {Event} event - The change event from the file input.
+             */
+            const handleLogoUpload = (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        companyLogo.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            /**
+             * Generates a PDF of the invoice content.
+             */
+            const generatePdf = () => {
+                const element = document.querySelector('.invoice-container'); // Select the main invoice container
+                const opt = {
+                    margin:       [0.5, 0.5, 0.5, 0.5], // Top, Left, Bottom, Right margin
+                    filename:     'invoice.pdf',
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 3, logging: true, dpi: 192, letterRendering: true, width: element.offsetWidth }, // Increased scale and added width
+                    jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+                };
+                html2pdf().set(opt).from(element).save();
+            };
+
+            /**
+             * Prints the current invoice content.
+             */
+            const printInvoice = () => {
+                window.print();
+            };
+
+            // Event Listeners
+            addItemBtn.addEventListener('click', addItem);
+            downloadPdfBtn.addEventListener('click', generatePdf);
+            printInvoiceBtn.addEventListener('click', printInvoice);
+            taxRateInput.addEventListener('input', updateTotals);
+            discountRateInput.addEventListener('input', updateTotals);
+            logoUpload.addEventListener('change', handleLogoUpload);
+
+            // Initial item and total calculation
+            addItem(); // Add one item row by default
+        });
+    </script>
+</body>
+</html>
